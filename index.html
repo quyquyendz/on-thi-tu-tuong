@@ -141,6 +141,13 @@
   .couplet{position:fixed;top:108px;width:44px;padding:16px 0;text-align:center;background:linear-gradient(180deg,#c0271b,#8a1c16);color:#ffd968;font-family:"Playfair Display",Georgia,serif;font-size:19px;font-weight:700;letter-spacing:6px;writing-mode:vertical-rl;border:2px solid #d9a441;border-radius:10px;box-shadow:0 8px 24px rgba(60,10,0,.35);z-index:40}
   .couplet.left{left:14px}.couplet.right{right:14px}
   @media (max-width:1180px){.couplet{display:none}}
+  .board{list-style:none;margin:6px 0 0;padding:0}
+  .board li{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--card)}
+  .board .rk{font-size:19px;width:30px;text-align:center;flex:none}
+  .board .nm{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board .sc{font-weight:700;color:var(--red-d)}
+  .board .dt{color:var(--muted);font-size:12.5px;flex:none}
+  .board li.me{border-color:var(--gold);background:var(--gold-l)}
   /* Toi uu mobile + lam bai */
   input,select,textarea{font-size:16px}
   button{touch-action:manipulation}
@@ -201,6 +208,15 @@
       <p style="margin:14px 0 4px"><b>Lịch sử làm bài gần nhất (đồng bộ)</b></p>
       <ul class="history" id="historyList"></ul>
     </div>
+  </section>
+
+  <section class="card hidden" id="boardBox">
+    <div class="userbar">
+      <h2 style="margin:0"><span class="num">🏆</span> Bảng xếp hạng</h2>
+      <button class="btn" id="boardRefresh" type="button">↻ Tải lại</button>
+    </div>
+    <p class="muted sub">Xếp theo tỉ lệ đúng cao nhất của mỗi người (điểm tốt nhất, mọi chế độ). Chỉ người đã đăng nhập mới xem được bảng này.</p>
+    <ol class="board" id="boardList"><li class="muted">Đang tải bảng xếp hạng…</li></ol>
   </section>
 
   <section class="card" id="setup">
@@ -545,7 +561,7 @@ document.getElementById("showAllBtn").addEventListener("click",()=>{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 /* ============================================================
    >>> DAN firebaseConfig CUA BAN VAO DAY <<<
@@ -626,9 +642,36 @@ function watchResults(user){
     const rec = { date: new Date().toLocaleString("vi-VN"), score: txt };
     try { const c=JSON.parse(localStorage.getItem("tthcm_fb_hist_"+user.uid)||"[]"); c.push(rec); localStorage.setItem("tthcm_fb_hist_"+user.uid, JSON.stringify(c.slice(-30))); } catch(e){}
     if (db) { try { await addDoc(collection(db, "users", user.uid, "results"), { score: txt, date: rec.date, at: serverTimestamp() }); } catch(e){} }
+    const mm = txt.match(/^(\d+)\/(\d+)/);
+    if (mm && db) { try { await updateBoard(user, parseInt(mm[1],10), parseInt(mm[2],10), rec.date); } catch(e){} }
     renderHistory(user);
   }).observe(box, {attributes:true, attributeFilter:["class"]});
 }
+async function updateBoard(user, right, total, dateStr){
+  if (!db || !total) return;
+  const pct = Math.round(right/total*100);
+  const ref = doc(db, "leaderboard", user.uid);
+  const snap = await getDoc(ref);
+  const cur = snap.exists() ? snap.data() : null;
+  if (cur && (cur.pct > pct || (cur.pct === pct && (cur.right||0) >= right))) { renderBoard(user); return; }
+  await setDoc(ref, { name: user.displayName || (user.email||"").split("@")[0], right: right, total: total, pct: pct, score: right+"/"+total, date: dateStr, at: serverTimestamp() });
+  renderBoard(user);
+}
+async function renderBoard(user){
+  const box = $("boardBox"); if (!box) return;
+  box.classList.remove("hidden");
+  const list = $("boardList"); if (!db || !list) return;
+  try {
+    const q = query(collection(db, "leaderboard"), orderBy("pct","desc"), limit(10));
+    const snap = await getDocs(q);
+    const rows = []; snap.forEach(d => rows.push(Object.assign({uid:d.id}, d.data())));
+    rows.sort((a,b) => (b.pct-a.pct) || (b.right-a.right));
+    if (!rows.length) { list.innerHTML = "<li class='muted'>Chưa có ai lên bảng — nộp bài đầu tiên để mở bảng nhé! 🧧</li>"; return; }
+    const medals = ["🥇","🥈","🥉"];
+    list.innerHTML = rows.map((r,i) => "<li class='"+(r.uid===user.uid?"me":"")+"'><span class='rk'>"+(medals[i]||(i+1))+"</span><span class='nm'>"+String(r.name||"?").replace(/[<>&]/g,"")+(r.uid===user.uid?" (bạn)":"")+"</span><span class='sc'>"+(r.score||"")+" · "+(r.pct||0)+"%</span><span class='dt'>"+String(r.date||"").replace(/[<>&]/g,"")+"</span></li>").join("");
+  } catch(e) { list.innerHTML = "<li class='muted'>Chưa tải được bảng xếp hạng (Firestore chưa có rules cho leaderboard hoặc chưa có dữ liệu).</li>"; }
+}
+$("boardRefresh").addEventListener("click", () => { if (currentUser) renderBoard(currentUser); });
 function enterApp(user){
   currentUser = user;
   document.body.classList.remove("locked");
@@ -637,6 +680,7 @@ function enterApp(user){
   $("helloName").textContent = user.displayName || (user.email||"").split("@")[0];
   $("helloUser").textContent = user.email || "";
   renderHistory(user);
+  renderBoard(user);
   watchResults(user);
 }
 $("tabLogin").addEventListener("click", () => setMode("login"));
