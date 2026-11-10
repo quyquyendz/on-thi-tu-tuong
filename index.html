@@ -141,6 +141,15 @@
   .couplet{position:fixed;top:108px;width:44px;padding:16px 0;text-align:center;background:linear-gradient(180deg,#c0271b,#8a1c16);color:#ffd968;font-family:"Playfair Display",Georgia,serif;font-size:19px;font-weight:700;letter-spacing:6px;writing-mode:vertical-rl;border:2px solid #d9a441;border-radius:10px;box-shadow:0 8px 24px rgba(60,10,0,.35);z-index:40}
   .couplet.left{left:14px}.couplet.right{right:14px}
   @media (max-width:1180px){.couplet{display:none}}
+  .hstats{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+  .hstats .chip{background:var(--gold-l);border:1px solid var(--gold);border-radius:999px;padding:5px 13px;font-size:13.5px;font-weight:600}
+  .hist{max-height:430px;overflow:auto}
+  .hist .hrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+  .hist .hmain{flex:1;min-width:0}
+  .hist .htitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hist .hdate{color:var(--muted);font-size:12.5px}
+  .hist .hscore{font-weight:700;color:var(--red-d);flex:none}
+  .hist .hpct{flex:none;font-size:12.5px;font-weight:700;border-radius:999px;padding:3px 10px;background:var(--green-l);color:var(--green)}
   .board{list-style:none;margin:6px 0 0;padding:0}
   .board li{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--card)}
   .board .rk{font-size:19px;width:30px;text-align:center;flex:none}
@@ -204,10 +213,6 @@
       <p class="muted" style="margin:2px 0 0">Tài khoản: <b id="helloUser"></b> · Kết quả làm bài được đồng bộ theo tài khoản này (Firestore).</p></div>
       <button class="btn" id="logoutBtn" type="button">Đăng xuất</button>
     </div>
-    <div id="historyWrap" class="hidden">
-      <p style="margin:14px 0 4px"><b>Lịch sử làm bài gần nhất (đồng bộ)</b></p>
-      <ul class="history" id="historyList"></ul>
-    </div>
   </section>
 
   <section class="card hidden" id="boardBox">
@@ -217,6 +222,16 @@
     </div>
     <p class="muted sub">Xếp theo tỉ lệ đúng cao nhất của mỗi người (điểm tốt nhất, mọi chế độ). Chỉ người đã đăng nhập mới xem được bảng này.</p>
     <ol class="board" id="boardList"><li class="muted">Đang tải bảng xếp hạng…</li></ol>
+  </section>
+
+  <section class="card hidden" id="historyBox">
+    <div class="userbar">
+      <h2 style="margin:0"><span class="num">📜</span> Lịch sử làm bài</h2>
+      <button class="btn" id="histRefresh" type="button">↻ Tải lại</button>
+    </div>
+    <p class="muted sub">Toàn bộ các lần làm bài của bạn (đồng bộ theo tài khoản, tối đa 50 lần gần nhất).</p>
+    <div class="hstats" id="histStats"></div>
+    <div class="hist" id="histList"><p class="muted">Đang tải lịch sử…</p></div>
   </section>
 
   <section class="card" id="setup">
@@ -615,21 +630,31 @@ function setMode(m){
   $("authErr").textContent=""; $("authOk").textContent="";
 }
 async function renderHistory(user){
+  const box = $("historyBox"); if (box) box.classList.remove("hidden");
   let items = [];
-  // Cache local (hien ngay, ke ca khi Firestore chua co quyen)
   try { items = JSON.parse(localStorage.getItem("tthcm_fb_hist_"+user.uid)||"[]"); } catch(e){}
   if (db) {
     try {
-      const q = query(collection(db, "users", user.uid, "results"), orderBy("at","desc"), limit(5));
+      const q = query(collection(db, "users", user.uid, "results"), orderBy("at","desc"), limit(50));
       const snap = await getDocs(q);
-      const remote = []; snap.forEach(d => { const v=d.data(); remote.push({date:v.date||"", score:v.score||""}); });
+      const remote = []; snap.forEach(d => { const v=d.data(); remote.push({date:v.date||"", score:v.score||"", title:v.title||""}); });
       if (remote.length) { items = remote.reverse(); localStorage.setItem("tthcm_fb_hist_"+user.uid, JSON.stringify(items)); }
-    } catch(e) { /* Firestore chua tao / chua co rules: bo qua, van dung cache local */ }
+    } catch(e) {}
   }
-  if (!items.length) { $("historyWrap").classList.add("hidden"); return; }
-  $("historyWrap").classList.remove("hidden");
-  $("historyList").innerHTML = items.slice(-5).reverse().map(h => "<li>"+h.date+" — "+h.score+"</li>").join("");
+  const list = $("histList"), stats = $("histStats");
+  if (!list) return;
+  if (!items.length) { list.innerHTML = "<p class='muted'>Chưa có lần làm bài nào — làm thử 1 đề là lịch sử hiện ở đây nhé.</p>"; if (stats) stats.innerHTML=""; return; }
+  const parsed = items.map(h => { const mm = String(h.score||"").match(/^(\d+)\/(\d+)/); return {h:h, r: mm?parseInt(mm[1],10):null, n: mm?parseInt(mm[2],10):null, pct: (mm&&+mm[2])?Math.round(+mm[1]/+mm[2]*100):null}; });
+  const valid = parsed.filter(x => x.pct !== null);
+  if (stats) {
+    const best = valid.length ? Math.max.apply(null, valid.map(x=>x.pct)) : 0;
+    const avg = valid.length ? Math.round(valid.reduce((s,x)=>s+x.pct,0)/valid.length) : 0;
+    stats.innerHTML = "<span class='chip'>📝 "+items.length+" lần làm</span><span class='chip'>🏆 Cao nhất: "+best+"%</span><span class='chip'>📊 Trung bình: "+avg+"%</span>";
+  }
+  const esc = s => String(s||"").replace(/[<>&]/g,"");
+  list.innerHTML = parsed.slice().reverse().map(x => "<div class='hrow'><div class='hmain'><div class='htitle'>"+esc(x.h.title || "Đề luyện thi")+"</div><div class='hdate'>"+esc(x.h.date)+"</div></div><span class='hscore'>"+esc(x.h.score)+"</span>"+(x.pct!==null?"<span class='hpct'>"+x.pct+"%</span>":"")+"</div>").join("");
 }
+$("histRefresh").addEventListener("click", () => { if (currentUser) renderHistory(currentUser); });
 let currentUser=null, watching=false, lastKey="";
 function watchResults(user){
   if (watching) return; watching = true;
@@ -639,9 +664,9 @@ function watchResults(user){
     const txt = ($("scoreText")||{}).textContent || "";
     const key = user.uid+"|"+txt+"|"+Math.floor(Date.now()/5000);
     if (!txt || key===lastKey) return; lastKey = key;
-    const rec = { date: new Date().toLocaleString("vi-VN"), score: txt };
-    try { const c=JSON.parse(localStorage.getItem("tthcm_fb_hist_"+user.uid)||"[]"); c.push(rec); localStorage.setItem("tthcm_fb_hist_"+user.uid, JSON.stringify(c.slice(-30))); } catch(e){}
-    if (db) { try { await addDoc(collection(db, "users", user.uid, "results"), { score: txt, date: rec.date, at: serverTimestamp() }); } catch(e){} }
+    const rec = { date: new Date().toLocaleString("vi-VN"), score: txt, title: (($("quizTitle")||{}).textContent || "").trim() };
+    try { const c=JSON.parse(localStorage.getItem("tthcm_fb_hist_"+user.uid)||"[]"); c.push(rec); localStorage.setItem("tthcm_fb_hist_"+user.uid, JSON.stringify(c.slice(-50))); } catch(e){}
+    if (db) { try { await addDoc(collection(db, "users", user.uid, "results"), { score: txt, date: rec.date, title: rec.title, at: serverTimestamp() }); } catch(e){} }
     const mm = txt.match(/^(\d+)\/(\d+)/);
     if (mm && db) { try { await updateBoard(user, parseInt(mm[1],10), parseInt(mm[2],10), rec.date); } catch(e){} }
     renderHistory(user);
