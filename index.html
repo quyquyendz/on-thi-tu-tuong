@@ -143,6 +143,14 @@
   @media (max-width:1180px){.couplet{display:none}}
   .roomrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
   .roomrow select,.roomrow input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+  .oly-head{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--gold-l);border:1px solid var(--gold);border-radius:12px;padding:9px 13px;margin:10px 0}
+  .oly-head #olyClock{font-weight:800;font-size:19px;color:var(--red-d);font-variant-numeric:tabular-nums}
+  .oly-tiles{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:12px 0}
+  .oly-tiles span{width:38px;height:46px;display:grid;place-items:center;font-size:21px;font-weight:800;border-radius:9px;background:var(--red);color:#ffd968;border:2px solid var(--gold)}
+  .oly-tiles span.open{background:var(--card);color:var(--red-d)}
+  .oly-tiles span.space{background:transparent;border-color:transparent;width:16px}
+  .stake{display:inline-block;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;margin:0 6px 8px 0;cursor:pointer;font-weight:700}
+  .stake.active{background:var(--red);color:#fff;border-color:var(--red)}
   .roomcode{font-size:34px;font-weight:800;letter-spacing:8px;color:var(--red-d);font-family:ui-monospace,Menlo,Consolas,monospace}
   .board .pbar{flex:none;width:90px;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
   .board .pbar i{display:block;height:100%;background:var(--gold)}
@@ -269,6 +277,37 @@
         <button class="btn primary hidden" id="roomStartBtn" type="button">▶ Bắt đầu thi</button>
         <button class="btn hidden" id="roomCloseBtn" type="button">Đóng phòng</button>
         <button class="btn" id="roomLeaveBtn" type="button">Rời phòng</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="olyBox">
+    <h2><span class="num">🏔️</span> Olympia — Đấu phòng</h2>
+    <div id="olyHome">
+      <p class="muted sub">Mô phỏng <b>Đường lên đỉnh Olympia</b> với ngân hàng câu hỏi của web: <b>Khởi động</b> 60 giây (+10/câu đúng) · <b>Vượt chướng ngại vật</b> (trả lời đúng +10, đoán đúng từ khoá ăn điểm lớn) · <b>Tăng tốc</b> 4 câu (đúng và nhanh nhất 40/30/20/10) · <b>Về đích</b> 3 câu tự chọn mức 20/30/40, có ⭐ Ngôi sao hy vọng (đúng ×2, sai trừ điểm). Cả phòng cùng một đề do hệ thống tự xào.</p>
+      <div class="roomrow">
+        <button class="btn primary" id="olyCreateBtn" type="button">➕ Tạo phòng Olympia</button>
+        <input id="olyCodeInput" type="text" placeholder="Mã phòng (6 ký tự)" maxlength="6" style="text-transform:uppercase">
+        <button class="btn" id="olyJoinBtn" type="button">🚪 Vào phòng</button>
+      </div>
+      <p class="auth-err" id="olyErr"></p>
+    </div>
+    <div id="olyLobby" class="hidden">
+      <p style="margin:0 0 4px">Mã phòng Olympia — gửi cho bạn bè:</p>
+      <div class="roomcode" id="olyCodeShow"></div>
+      <p class="muted" id="olyInfo" style="margin:2px 0 10px"></p>
+      <ol class="board" id="olyMembers"></ol>
+      <p class="muted" id="olyStatus"></p>
+      <div id="olyStage" class="hidden">
+        <div class="oly-head"><b id="olyRoundName"></b><span id="olyClock"></span></div>
+        <div id="olyBoard"></div>
+        <div id="olyQBox"></div>
+        <div id="olyExtra"></div>
+      </div>
+      <div class="roomrow">
+        <button class="btn primary hidden" id="olyStartBtn" type="button">▶ Bắt đầu trận Olympia</button>
+        <button class="btn hidden" id="olyCloseBtn" type="button">Đóng phòng</button>
+        <button class="btn" id="olyLeaveBtn" type="button">Rời phòng</button>
       </div>
     </div>
   </section>
@@ -649,6 +688,25 @@ window.__startRoomQuiz = function(cfg){
   timerId = setInterval(()=>{ document.getElementById("timer").textContent = fmt(Math.floor((Date.now()-startTime)/1000)); },1000);
   window.scrollTo({top:0,behavior:"smooth"});
 };
+const OLY_KEYWORDS = [
+  {disp:"ĐẠI ĐOÀN KẾT", plain:"DAIDOANKET", hint:"Sức mạnh lớn nhất để chiến thắng mọi kẻ thù, theo Hồ Chí Minh"},
+  {disp:"ĐỘC LẬP", plain:"DOCLAP", hint:"Mục tiêu thiêng liêng — là tiền đề của cách mạng Việt Nam"},
+  {disp:"TƯ TƯỞNG", plain:"TUTUONG", hint:"Được ví như kim chỉ nam cho hành động cách mạng"},
+  {disp:"CÁCH MẠNG", plain:"CACHMANG", hint:"Sự nghiệp của quần chúng nhân dân"},
+  {disp:"HỒ CHÍ MINH", plain:"HOCHIMINH", hint:"Tên của Người — cũng là tên của một hệ tư tưởng"},
+  {disp:"ĐẠO ĐỨC", plain:"DAODUC", hint:"Cái gốc của người cách mạng"},
+  {disp:"DÂN TỘC", plain:"DANTOC", hint:"Cội nguồn sức mạnh của Việt Nam"},
+  {disp:"ĐOÀN KẾT", plain:"DOANKET", hint:"Được ví như con ngươi của mắt ta"}
+];
+window.__olympiaSets = function(seed){
+  const rng = mulberry32(seed>>>0);
+  const allRaw = Object.keys(DATA).flatMap(k=>DATA[k].map(q=>({...q,chapter:k})));
+  const all = shuffleSeeded(allRaw, rng);
+  const take = arr => arr.map(q=>{ const order = shuffleSeeded([0,1,2,3], rng); return {q:q.q, chapter:q.chapter, opts:order.map(i=>q.opts[i]), a:order.indexOf(q.a)}; });
+  const kw = OLY_KEYWORDS[(seed>>>0) % OLY_KEYWORDS.length];
+  const revealOrder = shuffleSeeded(kw.plain.split("").map((_,i)=>i), mulberry32((seed^0x9e3779b9)>>>0));
+  return { kd: take(all.slice(0,40)), cnv: take(all.slice(40,45)), tt: take(all.slice(45,49)), vd: take(all.slice(49,52)), kw: kw, revealOrder: revealOrder };
+};
 function backToSetup(){
   clearInterval(timerId);
   document.getElementById("quizBox").classList.add("hidden");
@@ -927,6 +985,290 @@ $("roomJoinBtn").addEventListener("click", joinRoom);
 $("roomStartBtn").addEventListener("click", async () => { if (myRoom && db) { try { await updateDoc(doc(db, "rooms", myRoom.code), { status: "playing", startedAt: serverTimestamp() }); } catch(e){} } });
 $("roomCloseBtn").addEventListener("click", async () => { if (myRoom && db) { try { await updateDoc(doc(db, "rooms", myRoom.code), { status: myRoom.started ? "done" : "closed" }); } catch(e){} if (!myRoom.started) { myRoom = null; leaveRoomUI("Đã đóng phòng."); } } });
 $("roomLeaveBtn").addEventListener("click", leaveRoom);
+const OLET = "ABCD";
+const OPHASES = ["lobby","kd","cnv","cnv2","tt","vd","done"];
+let O = null, olyData = null, olyPlayers = {}, unsubOly = null, unsubOlyP = null, olyTick = null;
+function olyErr(m){ $("olyErr").textContent = m || ""; }
+function olyMyPl(){ return (currentUser && olyPlayers[currentUser.uid]) || {}; }
+function olyScoreFor(uid){
+  const pl = olyPlayers[uid]; if (!pl || !O || !O.sets || !olyData) return (pl && pl.score) || 0;
+  const cur = OPHASES.indexOf(olyData.status);
+  const closed = (phase, i) => { const pi = OPHASES.indexOf(phase); if (cur > pi) return true; if (cur === pi) return (olyData.qIndex || 0) > i; return false; };
+  let s = (pl.kdCorrect || 0) * 10;
+  for (let i = 0; i < 5; i++) if (closed("cnv", i) && pl.cnvAns && pl.cnvAns[i] && pl.cnvAns[i].c === O.sets.cnv[i].a) s += 10;
+  if (pl.cnvWon) s += pl.cnvBonus || 0;
+  const TTPTS = [40,30,20,10,5];
+  for (let i = 0; i < 4; i++) if (closed("tt", i)) {
+    const a = O.sets.tt[i].a;
+    const rights = Object.keys(olyPlayers).filter(u => olyPlayers[u].ttAns && olyPlayers[u].ttAns[i] && olyPlayers[u].ttAns[i].c === a)
+      .sort((x,y) => (olyPlayers[x].ttAns[i].at - olyPlayers[y].ttAns[i].at) || (x < y ? -1 : 1));
+    const r = rights.indexOf(uid);
+    if (r >= 0) s += TTPTS[Math.min(r, TTPTS.length - 1)];
+  }
+  for (let i = 0; i < 3; i++) if (closed("vd", i) && pl.vdAns && pl.vdAns[i]) {
+    const v = pl.vdAns[i];
+    if (v.c === O.sets.vd[i].a) s += v.stake * (v.star ? 2 : 1); else s -= v.stake;
+  }
+  return s;
+}
+async function olyCreate(){
+  olyErr("");
+  if (!db || !currentUser) { olyErr("Chưa kết nối được Firebase."); return; }
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let code = "";
+  try {
+    for (let k = 0; k < 10 && !code; k++) {
+      let c = ""; for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random()*chars.length)];
+      const s = await getDoc(doc(db, "olympia", c));
+      if (!s.exists()) code = c;
+    }
+    if (!code) { olyErr("Không tạo được mã phòng, thử lại nhé."); return; }
+    const seed = Math.floor(Math.random()*2147483646) + 1;
+    await setDoc(doc(db, "olympia", code), { hostUid: currentUser.uid, hostName: myName(), seed: seed, status: "lobby", qIndex: 0, cnvRevealed: 0, endsAt: 0, createdAt: serverTimestamp() });
+    await setDoc(doc(db, "olympia", code, "players", currentUser.uid), { name: myName(), host: true, score: 0, kdCorrect: 0, kdAnswered: 0, joinedAt: serverTimestamp() });
+    enterOly(code, true, seed);
+  } catch(e) { olyErr("Tạo phòng Olympia lỗi — có thể Firestore chưa có rules cho olympia."); }
+}
+async function olyJoin(){
+  olyErr("");
+  if (!db || !currentUser) { olyErr("Chưa kết nối được Firebase."); return; }
+  const code = ($("olyCodeInput").value || "").trim().toUpperCase();
+  if (code.length !== 6) { olyErr("Mã phòng gồm đúng 6 ký tự."); return; }
+  try {
+    const snap = await getDoc(doc(db, "olympia", code));
+    if (!snap.exists()) { olyErr("Không tìm thấy phòng Olympia " + code + "."); return; }
+    if (snap.data().status !== "lobby") { olyErr("Trận Olympia này đã bắt đầu hoặc đã kết thúc."); return; }
+    await setDoc(doc(db, "olympia", code, "players", currentUser.uid), { name: myName(), host: false, score: 0, kdCorrect: 0, kdAnswered: 0, joinedAt: serverTimestamp() });
+    enterOly(code, false, snap.data().seed);
+  } catch(e) { olyErr("Vào phòng Olympia lỗi — thử lại sau giây lát."); }
+}
+function enterOly(code, isHost, seed){
+  O = { code: code, isHost: isHost, sets: window.__olympiaSets(seed), phase: "lobby", kdIdx: 0, kdCorrect: 0, kdAnswered: 0, kdLocked: false, kdInit: false, qSeen: "", vdStake: 20, vdStar: false, hostBusy: false, lastKdFlush: 0 };
+  $("olyHome").classList.add("hidden");
+  $("olyLobby").classList.remove("hidden");
+  $("olyCodeShow").textContent = code;
+  if (isHost) { $("olyStartBtn").classList.remove("hidden"); $("olyCloseBtn").classList.remove("hidden"); }
+  unsubOly = onSnapshot(doc(db, "olympia", code), (snap) => {
+    if (!snap.exists()) { olyLeaveUI("Phòng Olympia đã bị xoá."); O = null; return; }
+    olyData = snap.data();
+    $("olyInfo").textContent = "Chủ phòng: " + olyData.hostName + " · 4 vòng: Khởi động · Vượt CNV · Tăng tốc · Về đích";
+    if (olyData.status === "closed") { olyLeaveUI("Chủ phòng đã đóng phòng Olympia."); O = null; return; }
+    if (olyData.status !== "lobby") $("olyStage").classList.remove("hidden");
+    olyRenderStage();
+    olySyncMyScore();
+  });
+  unsubOlyP = onSnapshot(collection(db, "olympia", code, "players"), (snap) => {
+    olyPlayers = {}; snap.forEach(d => olyPlayers[d.id] = d.data());
+    olyRenderMembers();
+    olySyncMyScore();
+  });
+  if (olyTick) clearInterval(olyTick);
+  olyTick = setInterval(olyOnTick, 300);
+}
+function olySyncMyScore(){
+  if (!O || !olyData || olyData.status === "lobby" || !currentUser) return;
+  const s = olyScoreFor(currentUser.uid);
+  if (olyMyPl().score !== s) updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { score: s }).catch(()=>{});
+}
+function olyRenderMembers(){
+  const list = $("olyMembers"); if (!list || !currentUser) return;
+  const arr = Object.keys(olyPlayers).map(uid => Object.assign({ uid: uid }, olyPlayers[uid]));
+  arr.sort((a,b) => (olyScoreFor(b.uid) - olyScoreFor(a.uid)) || ((a.name||"") < (b.name||"") ? -1 : 1));
+  const medals = ["🥇","🥈","🥉"];
+  const inGame = olyData && olyData.status !== "lobby";
+  list.innerHTML = arr.length ? arr.map((pl,i) =>
+    "<li class='" + (pl.uid === currentUser.uid ? "me" : "") + "'><span class='rk'>" + (inGame ? (medals[i] || (i+1)) : "·") + "</span><span class='nm'>" + esc2(pl.name) + (pl.host ? " 👑" : "") + (pl.uid === currentUser.uid ? " (bạn)" : "") + "</span><span class='sc'>" + (inGame ? olyScoreFor(pl.uid) + " điểm" : "đã vào phòng") + "</span></li>"
+  ).join("") : "<li class='muted'>Chưa có ai trong phòng…</li>";
+  const st = $("olyStatus");
+  if (olyData) {
+    if (olyData.status === "lobby") st.textContent = "Đang chờ — chủ phòng bấm ▶ Bắt đầu trận khi đủ người.";
+    else if (olyData.status === "done") { const top = arr[0]; st.textContent = top ? "🏁 Trận đấu kết thúc! Nhà vô địch: " + top.name + " — " + olyScoreFor(top.uid) + " điểm 🏆" : "🏁 Trận đấu kết thúc!"; }
+  }
+}
+function olyTilesHTML(){
+  const kw = O.sets.kw, revealed = olyData.cnvRevealed || 0;
+  const dispChars = Array.from(kw.disp);
+  let pi = 0, html = "<div class='oly-tiles'>";
+  for (const ch of dispChars) {
+    if (ch === " ") { html += "<span class='space'></span>"; continue; }
+    const isOpen = O.sets.revealOrder.indexOf(pi) < revealed;
+    html += "<span class='" + (isOpen ? "open" : "") + "'>" + (isOpen ? esc2(ch) : "?") + "</span>";
+    pi++;
+  }
+  return html + "</div><p class='muted' style='text-align:center;margin:2px 0 8px'>Gợi ý: " + esc2(kw.hint) + " · Đã mở " + revealed + "/" + kw.plain.length + " ô</p>";
+}
+function olyRenderQ(q, tag, onPick, picked){
+  const box = $("olyQBox");
+  let h = "<div class='q'><div class='tags'><span class='tag'>" + esc2(tag) + "</span></div><h3 style='margin:6px 0 10px'>" + esc2(q.q) + "</h3>";
+  box.innerHTML = h;
+  q.opts.forEach((opt, oi) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "opt";
+    if (picked !== undefined && picked !== null) { b.disabled = true; if (oi === q.a) b.classList.add("correct"); if (picked === oi && oi !== q.a) b.classList.add("wrong"); }
+    b.innerHTML = "<span class='l'>" + OLET[oi] + "</span><span>" + esc2(opt) + "</span>";
+    b.addEventListener("click", () => onPick(oi));
+    box.appendChild(b);
+  });
+}
+function olyRenderStage(){
+  if (!O || !olyData) return;
+  const st = olyData.status, RN = $("olyRoundName"), EX = $("olyExtra"), BD = $("olyBoard");
+  const key = st + ":" + (olyData.qIndex || 0);
+  if (st === "kd") {
+    RN.textContent = "🚀 VÒNG 1 · KHỞI ĐỘNG — đúng +10, trả lời càng nhiều càng tốt!";
+    BD.innerHTML = ""; EX.innerHTML = "";
+    if (!O.kdInit) {
+      O.kdInit = true; O.kdIdx = 0; O.kdCorrect = 0; O.kdAnswered = 0; O.kdLocked = false;
+      olyKdShow();
+    }
+    return;
+  }
+  if (st === "cnv" || st === "cnv2") {
+    RN.textContent = st === "cnv" ? "🧩 VÒNG 2 · VƯỢT CHƯỚNG NGẠI VẬT — hàng ngang " + ((olyData.qIndex||0)+1) + "/5" : "🧩 VÒNG 2 · CƠ HỘI ĐOÁN CUỐI — đoán chướng ngại vật ngay!";
+    BD.innerHTML = olyTilesHTML();
+    const winner = Object.keys(olyPlayers).find(u => olyPlayers[u].cnvWon);
+    let ex = "";
+    if (winner) ex = "<p style='font-weight:700;color:var(--green)'>🎉 " + esc2(olyPlayers[winner].name) + " đã đoán đúng chướng ngại vật: " + esc2(O.sets.kw.disp) + "!</p>";
+    else if (!olyMyPl().cnvLocked) ex = "<div class='roomrow'><input id='olyGuess' type='text' placeholder='Đoán chướng ngại vật (không cần dấu)…' style='flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)'><button class='btn primary' id='olyGuessBtn' type='button'>Đoán CNV</button></div><p class='muted'>Đoán đúng: +" + Math.max(20, 60 - (olyData.cnvRevealed||0)*10) + " điểm · Đoán sai: mất quyền đoán tiếp.</p>";
+    else ex = "<p class='muted'>Bạn đã đoán sai nên mất quyền đoán ở vòng này.</p>";
+    EX.innerHTML = ex;
+    const gb = $("olyGuessBtn");
+    if (gb) gb.addEventListener("click", olyGuess);
+    if (st === "cnv") {
+      if (O.qSeen !== key) {
+        O.qSeen = key;
+        const my = olyMyPl();
+        const picked = my.cnvAns && my.cnvAns[olyData.qIndex] ? my.cnvAns[olyData.qIndex].c : undefined;
+        olyRenderQ(O.sets.cnv[olyData.qIndex], "Hàng ngang " + ((olyData.qIndex||0)+1) + " · Chương " + O.sets.cnv[olyData.qIndex].chapter, (oi) => olyAnswerQ("cnvAns", olyData.qIndex, oi), picked);
+      }
+    } else { $("olyQBox").innerHTML = ""; }
+    return;
+  }
+  if (st === "tt") {
+    RN.textContent = "⚡ VÒNG 3 · TĂNG TỐC — câu " + ((olyData.qIndex||0)+1) + "/4 · đúng và nhanh nhất ăn 40 điểm!";
+    BD.innerHTML = ""; EX.innerHTML = "";
+    if (O.qSeen !== key) {
+      O.qSeen = key;
+      const my = olyMyPl();
+      const picked = my.ttAns && my.ttAns[olyData.qIndex] ? my.ttAns[olyData.qIndex].c : undefined;
+      olyRenderQ(O.sets.tt[olyData.qIndex], "Tăng tốc · Chương " + O.sets.tt[olyData.qIndex].chapter, (oi) => olyAnswerQ("ttAns", olyData.qIndex, oi), picked);
+    }
+    return;
+  }
+  if (st === "vd") {
+    RN.textContent = "🎯 VÒNG 4 · VỀ ĐÍCH — câu " + ((olyData.qIndex||0)+1) + "/3 · chọn mức điểm rồi trả lời";
+    BD.innerHTML = "";
+    if (O.qSeen !== key) {
+      O.qSeen = key; O.vdStake = 20; O.vdStar = false;
+      const my = olyMyPl();
+      const picked = my.vdAns && my.vdAns[olyData.qIndex] ? my.vdAns[olyData.qIndex].c : undefined;
+      let ex = "<div style='margin-bottom:8px'><span class='muted'>Mức điểm: </span>" + [20,30,40].map(v => "<button type='button' class='stake" + (v === 20 ? " active" : "") + "' data-stake='" + v + "'>" + v + "</button>").join("");
+      ex += "<button type='button' class='stake' id='olyStarBtn'" + (my.vdStarUsed ? " disabled style='opacity:.4'" : "") + ">⭐ Ngôi sao hy vọng" + (my.vdStarUsed ? " (đã dùng)" : "") + "</button></div><p class='muted'>Đúng: +mức điểm (⭐ thì ×2) · Sai: −mức điểm. Chọn mức trước khi bấm đáp án.</p>";
+      EX.innerHTML = ex;
+      EX.querySelectorAll("[data-stake]").forEach(el => el.addEventListener("click", () => { O.vdStake = parseInt(el.dataset.stake,10); EX.querySelectorAll("[data-stake]").forEach(x => x.classList.toggle("active", x === el)); }));
+      const sb = $("olyStarBtn");
+      if (sb && !my.vdStarUsed) sb.addEventListener("click", () => { O.vdStar = !O.vdStar; sb.classList.toggle("active", O.vdStar); });
+      olyRenderQ(O.sets.vd[olyData.qIndex], "Về đích · Chương " + O.sets.vd[olyData.qIndex].chapter, (oi) => olyAnswerVd(olyData.qIndex, oi), picked);
+    }
+    return;
+  }
+  if (st === "done") {
+    RN.textContent = "🏁 KẾT THÚC TRẬN ĐẤU";
+    BD.innerHTML = ""; EX.innerHTML = "";
+    $("olyQBox").innerHTML = "<p style='text-align:center;font-weight:700'>Xem thứ hạng chung cuộc ở bảng trên. Cảm ơn cả phòng đã thi đấu! 🏆</p>";
+    return;
+  }
+}
+function olyKdShow(){
+  const box = $("olyQBox");
+  if (!O || O.kdLocked) return;
+  if (O.kdIdx >= O.sets.kd.length) { box.innerHTML = "<p style='font-weight:700'>Bạn đã trả lời hết bộ câu Khởi động — chờ hết giờ nhé!</p>"; return; }
+  const q = O.sets.kd[O.kdIdx];
+  olyRenderQ(q, "Khởi động · Đã làm " + O.kdAnswered + " · Đúng " + O.kdCorrect, (oi) => {
+    if (O.kdLocked) return;
+    O.kdAnswered++;
+    if (oi === q.a) O.kdCorrect++;
+    O.kdIdx++;
+    olyKdShow();
+  }, undefined);
+  $("olyRoundName").textContent = "🚀 VÒNG 1 · KHỞI ĐỘNG — Đã làm " + O.kdAnswered + " · Đúng " + O.kdCorrect + " (+" + (O.kdCorrect*10) + "đ)";
+}
+async function olyAnswerQ(field, idx, oi){
+  if (!O || !currentUser) return;
+  const upd = {}; upd[field + "." + idx] = { c: oi, at: Date.now() };
+  try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), upd); } catch(e){}
+  olyRenderStage();
+}
+async function olyAnswerVd(idx, oi){
+  if (!O || !currentUser) return;
+  const upd = {}; upd["vdAns." + idx] = { c: oi, at: Date.now(), stake: O.vdStake, star: !!O.vdStar };
+  if (O.vdStar) upd.vdStarUsed = true;
+  try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), upd); } catch(e){}
+  O.qSeen = ""; olyRenderStage();
+}
+function olyNorm(s){ return (s || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/Đ/g, "D").replace(/[^A-Z0-9]/g, ""); }
+async function olyGuess(){
+  if (!O || !currentUser) return;
+  const v = olyNorm($("olyGuess").value);
+  if (!v) return;
+  if (v === O.sets.kw.plain) {
+    const bonus = Math.max(20, 60 - (olyData.cnvRevealed || 0) * 10);
+    try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { cnvWon: true, cnvWonAt: Date.now(), cnvBonus: bonus }); } catch(e){}
+  } else {
+    try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { cnvLocked: true }); } catch(e){}
+    alert("Chưa đúng chướng ngại vật — bạn mất quyền đoán ở vòng này.");
+  }
+  olyRenderStage();
+}
+function olyOnTick(){
+  if (!O || !olyData) return;
+  const now = Date.now();
+  const ck = $("olyClock");
+  if (ck) ck.textContent = olyData.endsAt ? Math.max(0, Math.ceil((olyData.endsAt - now) / 1000)) + "s" : "";
+  if (olyData.status === "kd" && O.kdInit && !O.kdLocked && olyData.endsAt && now > olyData.endsAt) {
+    O.kdLocked = true;
+    updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { kdCorrect: O.kdCorrect, kdAnswered: O.kdAnswered }).catch(()=>{});
+    $("olyQBox").innerHTML = "<p style='font-weight:700'>⏱️ Hết giờ Khởi động! Bạn đúng " + O.kdCorrect + " câu (+" + (O.kdCorrect*10) + " điểm). Chờ chủ phòng chuyển vòng…</p>";
+  }
+  if (olyData.status === "kd" && O.kdInit && !O.kdLocked && now - (O.lastKdFlush || 0) > 1200) {
+    O.lastKdFlush = now;
+    updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { kdCorrect: O.kdCorrect, kdAnswered: O.kdAnswered }).catch(()=>{});
+  }
+  if (O.isHost && olyData.endsAt && now > olyData.endsAt && !O.hostBusy) {
+    O.hostBusy = true;
+    const st = olyData.status, qi = olyData.qIndex || 0, kwLen = O.sets.kw.plain.length;
+    let upd = null;
+    if (st === "kd") upd = { status: "cnv", qIndex: 0, cnvRevealed: 0, endsAt: now + 20000 };
+    else if (st === "cnv" && qi < 4) upd = { qIndex: qi + 1, cnvRevealed: Math.min(kwLen, (olyData.cnvRevealed || 0) + 1), endsAt: now + 20000 };
+    else if (st === "cnv") upd = { status: "cnv2", cnvRevealed: Math.min(kwLen, (olyData.cnvRevealed || 0) + 1), endsAt: now + 12000 };
+    else if (st === "cnv2") upd = { status: "tt", qIndex: 0, endsAt: now + 15000 };
+    else if (st === "tt" && qi < 3) upd = { qIndex: qi + 1, endsAt: now + 15000 };
+    else if (st === "tt") upd = { status: "vd", qIndex: 0, endsAt: now + 25000 };
+    else if (st === "vd" && qi < 2) upd = { qIndex: qi + 1, endsAt: now + 25000 };
+    else if (st === "vd") upd = { status: "done", endsAt: 0 };
+    if (upd) updateDoc(doc(db, "olympia", O.code), upd).catch(()=>{}).finally(() => { O.hostBusy = false; });
+    else O.hostBusy = false;
+  }
+}
+function olyLeaveUI(msg){
+  if (unsubOly) unsubOly(); if (unsubOlyP) unsubOlyP(); unsubOly = unsubOlyP = null;
+  if (olyTick) { clearInterval(olyTick); olyTick = null; }
+  olyData = null; olyPlayers = {};
+  $("olyLobby").classList.add("hidden"); $("olyHome").classList.remove("hidden");
+  $("olyStartBtn").classList.add("hidden"); $("olyCloseBtn").classList.add("hidden");
+  if (msg) olyErr(msg);
+}
+async function olyLeave(){
+  const code = O && O.code;
+  if (code && db && currentUser) { try { await deleteDoc(doc(db, "olympia", code, "players", currentUser.uid)); } catch(e){} }
+  O = null;
+  olyLeaveUI("");
+}
+$("olyCreateBtn").addEventListener("click", olyCreate);
+$("olyJoinBtn").addEventListener("click", olyJoin);
+$("olyStartBtn").addEventListener("click", async () => { if (O && db) { try { await updateDoc(doc(db, "olympia", O.code), { status: "kd", qIndex: 0, cnvRevealed: 0, endsAt: Date.now() + 60000 }); } catch(e){} } });
+$("olyCloseBtn").addEventListener("click", async () => { if (O && db) { try { await updateDoc(doc(db, "olympia", O.code), { status: (olyData && olyData.status !== "lobby") ? "done" : "closed", endsAt: 0 }); } catch(e){} } });
+$("olyLeaveBtn").addEventListener("click", olyLeave);
 function enterApp(user){
   currentUser = user;
   document.body.classList.remove("locked");
@@ -937,6 +1279,7 @@ function enterApp(user){
   renderHistory(user);
   renderBoard(user);
   const rb = $("roomBox"); if (rb) rb.classList.remove("hidden");
+  const ob = $("olyBox"); if (ob) ob.classList.remove("hidden");
   watchResults(user);
 }
 $("tabLogin").addEventListener("click", () => setMode("login"));
