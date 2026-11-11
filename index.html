@@ -141,6 +141,11 @@
   .couplet{position:fixed;top:108px;width:44px;padding:16px 0;text-align:center;background:linear-gradient(180deg,#c0271b,#8a1c16);color:#ffd968;font-family:"Playfair Display",Georgia,serif;font-size:19px;font-weight:700;letter-spacing:6px;writing-mode:vertical-rl;border:2px solid #d9a441;border-radius:10px;box-shadow:0 8px 24px rgba(60,10,0,.35);z-index:40}
   .couplet.left{left:14px}.couplet.right{right:14px}
   @media (max-width:1180px){.couplet{display:none}}
+  .roomrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+  .roomrow select,.roomrow input{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+  .roomcode{font-size:34px;font-weight:800;letter-spacing:8px;color:var(--red-d);font-family:ui-monospace,Menlo,Consolas,monospace}
+  .board .pbar{flex:none;width:90px;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+  .board .pbar i{display:block;height:100%;background:var(--gold)}
   .witem{border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:9px;text-align:left}
   .witem h4{margin:4px 0 8px;font-size:15.5px}
   .wline{border-radius:9px;padding:7px 11px;margin:5px 0;font-size:14.5px}
@@ -237,6 +242,35 @@
     <p class="muted sub">Toàn bộ các lần làm bài của bạn (đồng bộ theo tài khoản, tối đa 50 lần gần nhất).</p>
     <div class="hstats" id="histStats"></div>
     <div class="hist" id="histList"><p class="muted">Đang tải lịch sử…</p></div>
+  </section>
+
+  <section class="card hidden" id="roomBox">
+    <h2><span class="num">🏟️</span> Phòng thi đấu</h2>
+    <div id="roomHome">
+      <p class="muted sub">Tạo phòng: hệ thống <b>tự xào một đề chung</b> cho cả phòng (cùng câu hỏi, cùng thứ tự đáp án), thi bằng chế độ <b>ôn từng câu</b> — chọn đúng mới qua câu tiếp, điểm tính theo lần chọn đầu. Gửi mã phòng cho bạn bè vào thi cùng.</p>
+      <div class="roomrow">
+        <label>Chương <select id="roomChapter"><option value="2">Chương 2</option><option value="3">Chương 3</option><option value="4">Chương 4</option><option value="5">Chương 5</option><option value="6">Chương 6</option><option value="both" selected>Tất cả 5 chương</option></select></label>
+        <label>Số câu <select id="roomCount"><option>10</option><option selected>20</option><option>30</option><option>50</option></select></label>
+        <button class="btn primary" id="roomCreateBtn" type="button">➕ Tạo phòng</button>
+      </div>
+      <div class="roomrow">
+        <input id="roomCodeInput" type="text" placeholder="Nhập mã phòng (6 ký tự)" maxlength="6" style="text-transform:uppercase">
+        <button class="btn" id="roomJoinBtn" type="button">🚪 Vào phòng</button>
+      </div>
+      <p class="auth-err" id="roomErr"></p>
+    </div>
+    <div id="roomLobby" class="hidden">
+      <p style="margin:0 0 4px">Mã phòng — gửi cho bạn bè:</p>
+      <div class="roomcode" id="roomCodeShow"></div>
+      <p class="muted" id="roomInfo" style="margin:2px 0 10px"></p>
+      <ol class="board" id="roomMembers"></ol>
+      <p class="muted" id="roomStatus"></p>
+      <div class="roomrow">
+        <button class="btn primary hidden" id="roomStartBtn" type="button">▶ Bắt đầu thi</button>
+        <button class="btn hidden" id="roomCloseBtn" type="button">Đóng phòng</button>
+        <button class="btn" id="roomLeaveBtn" type="button">Rời phòng</button>
+      </div>
+    </div>
   </section>
 
   <section class="card" id="setup">
@@ -394,6 +428,8 @@ function start(){
   document.getElementById("resultBox").classList.add("hidden");
   document.getElementById("quizBox").classList.remove("hidden");
   document.getElementById("submitBtn").style.display = mode==="single" ? "none" : "";
+  document.getElementById("reshuffleBtn").style.display = "";
+  document.getElementById("restartBtn").style.display = "";
   document.getElementById("quizTitle").textContent =
     isMock ? "Thi thử · 50 câu · 60 phút" :
     mode==="single" ? "Ôn từng câu một" :
@@ -582,6 +618,37 @@ function startWrongRetry(){
   window.scrollTo({top:0,behavior:"smooth"});
 }
 document.getElementById("retryWrongBtn").addEventListener("click", startWrongRetry);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let x=Math.imul(a^a>>>15,1|a);x=x+Math.imul(x^x>>>7,61|x)^x;return((x^x>>>14)>>>0)/4294967296;};}
+function shuffleSeeded(arr,rng){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+window.__startRoomQuiz = function(cfg){
+  chapter = cfg.chapter;
+  const rng = mulberry32(cfg.seed>>>0);
+  let list = pool();
+  list = shuffleSeeded(list, rng);
+  const n = Math.min(cfg.count, list.length);
+  current = list.slice(0,n).map(q=>{
+    const order = shuffleSeeded([0,1,2,3], rng);
+    return {q:q.q, chapter:q.chapter, opts:order.map(i=>q.opts[i]), a:order.indexOf(q.a)};
+  });
+  answers = {}; submitted = false;
+  mode = "single"; isMock = false; pendingMock = false;
+  singleIdx = 0; singleWrong = {}; singleTried = {}; singleFirst = 0; singleLastCorrect = false; singleFirstPick = {}; lastWrong = [];
+  document.getElementById("setup").classList.add("hidden");
+  document.getElementById("modesCard").classList.add("hidden");
+  document.getElementById("resultBox").classList.add("hidden");
+  document.getElementById("quizBox").classList.remove("hidden");
+  document.getElementById("submitBtn").style.display = "none";
+  document.getElementById("reshuffleBtn").style.display = "none";
+  document.getElementById("restartBtn").style.display = "none";
+  document.getElementById("quizTitle").textContent = "🏟️ Phòng "+cfg.code+" · Ôn từng câu · "+current.length+" câu";
+  render();
+  startTime = Date.now();
+  window.__roomQuizStart = Date.now();
+  clearInterval(timerId);
+  document.getElementById("timer").textContent = "00:00";
+  timerId = setInterval(()=>{ document.getElementById("timer").textContent = fmt(Math.floor((Date.now()-startTime)/1000)); },1000);
+  window.scrollTo({top:0,behavior:"smooth"});
+};
 function backToSetup(){
   clearInterval(timerId);
   document.getElementById("quizBox").classList.add("hidden");
@@ -630,7 +697,7 @@ document.getElementById("showAllBtn").addEventListener("click",()=>{
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 /* ============================================================
    >>> DAN firebaseConfig CUA BAN VAO DAY <<<
@@ -723,6 +790,7 @@ function watchResults(user){
     if (db) { try { await addDoc(collection(db, "users", user.uid, "results"), { score: txt, date: rec.date, title: rec.title, at: serverTimestamp() }); } catch(e){} }
     const mm = txt.match(/^(\d+)\/(\d+)/);
     if (mm && db) { try { await updateBoard(user, parseInt(mm[1],10), parseInt(mm[2],10), rec.date); } catch(e){} }
+    if (window.__roomActive && db) { const rc = window.__roomActive; window.__roomActive = null; try { const m2 = txt.match(/^(\d+)\/(\d+)/); if (m2) { const r=+m2[1], n=+m2[2]; await updateDoc(doc(db, "rooms", rc, "players", user.uid), { done: n, finished: true, right: r, total: n, pct: n?Math.round(r/n*100):0, score: r+"/"+n, durSec: Math.max(1, Math.round((Date.now()-(window.__roomQuizStart||Date.now()))/1000)) }); if (myRoom) myRoom.finished = true; stopRoomPoll(); } } catch(e){} }
     renderHistory(user);
   }).observe(box, {attributes:true, attributeFilter:["class"]});
 }
@@ -751,6 +819,114 @@ async function renderBoard(user){
   } catch(e) { list.innerHTML = "<li class='muted'>Chưa tải được bảng xếp hạng (Firestore chưa có rules cho leaderboard hoặc chưa có dữ liệu).</li>"; }
 }
 $("boardRefresh").addEventListener("click", () => { if (currentUser) renderBoard(currentUser); });
+const esc2 = s => String(s||"").replace(/[<>&]/g,"");
+let myRoom = null, unsubRoom = null, unsubPlayers = null, roomData = null, roomPlayers = {}, roomPoll = null, lastDoneSent = -1;
+function myName(){ return currentUser.displayName || (currentUser.email||"").split("@")[0]; }
+function roomErr(msg){ $("roomErr").textContent = msg || ""; }
+async function createRoom(){
+  roomErr("");
+  if (!db || !currentUser) { roomErr("Chưa kết nối được Firebase."); return; }
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let code = "";
+  try {
+    for (let k = 0; k < 10 && !code; k++) {
+      let c = ""; for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random()*chars.length)];
+      const s = await getDoc(doc(db, "rooms", c));
+      if (!s.exists()) code = c;
+    }
+    if (!code) { roomErr("Không tạo được mã phòng, thử lại nhé."); return; }
+    const seed = Math.floor(Math.random()*2147483646) + 1;
+    await setDoc(doc(db, "rooms", code), { hostUid: currentUser.uid, hostName: myName(), chapter: $("roomChapter").value, count: parseInt($("roomCount").value,10), seed: seed, status: "waiting", createdAt: serverTimestamp() });
+    await setDoc(doc(db, "rooms", code, "players", currentUser.uid), { name: myName(), host: true, done: 0, finished: false, joinedAt: serverTimestamp() });
+    enterRoom(code, true);
+  } catch(e) { roomErr("Tạo phòng lỗi — có thể Firestore chưa có rules cho rooms. Báo lại cho chủ web nhé."); }
+}
+async function joinRoom(){
+  roomErr("");
+  if (!db || !currentUser) { roomErr("Chưa kết nối được Firebase."); return; }
+  const code = ($("roomCodeInput").value || "").trim().toUpperCase();
+  if (code.length !== 6) { roomErr("Mã phòng gồm đúng 6 ký tự."); return; }
+  try {
+    const snap = await getDoc(doc(db, "rooms", code));
+    if (!snap.exists()) { roomErr("Không tìm thấy phòng " + code + " — kiểm tra lại mã nhé."); return; }
+    if (snap.data().status !== "waiting") { roomErr("Phòng này đã bắt đầu thi hoặc đã đóng, không vào thêm được."); return; }
+    await setDoc(doc(db, "rooms", code, "players", currentUser.uid), { name: myName(), host: false, done: 0, finished: false, joinedAt: serverTimestamp() });
+    enterRoom(code, false);
+  } catch(e) { roomErr("Vào phòng lỗi — thử lại sau giây lát."); }
+}
+function enterRoom(code, isHost){
+  myRoom = { code: code, isHost: isHost, started: false, finished: false };
+  $("roomHome").classList.add("hidden");
+  $("roomLobby").classList.remove("hidden");
+  $("roomCodeShow").textContent = code;
+  if (isHost) { $("roomStartBtn").classList.remove("hidden"); $("roomCloseBtn").classList.remove("hidden"); }
+  unsubRoom = onSnapshot(doc(db, "rooms", code), (snap) => {
+    if (!snap.exists()) { leaveRoomUI("Phòng đã bị xoá."); myRoom = null; return; }
+    roomData = snap.data();
+    $("roomInfo").textContent = "Chủ phòng: " + roomData.hostName + " · " + (roomData.chapter === "both" ? "Tất cả 5 chương" : "Chương " + roomData.chapter) + " · " + roomData.count + " câu · Ôn từng câu";
+    const st = $("roomStatus");
+    if (roomData.status === "waiting") st.textContent = "Đang chờ người vào — chủ phòng sẽ bấm ▶ Bắt đầu khi sẵn sàng.";
+    if (roomData.status === "playing" && myRoom && !myRoom.started) {
+      myRoom.started = true;
+      st.textContent = "🏁 Đang thi đấu — tiến độ cập nhật trực tiếp ở danh sách trên!";
+      window.__roomActive = code;
+      if (window.__startRoomQuiz) window.__startRoomQuiz({ chapter: roomData.chapter, count: roomData.count, seed: roomData.seed, code: code });
+      startRoomPoll();
+    }
+    if (roomData.status === "done") st.textContent = "🏁 Phòng đã kết thúc — thứ hạng chung cuộc ở danh sách trên.";
+    if (roomData.status === "closed") { leaveRoomUI("Chủ phòng đã đóng phòng."); myRoom = null; }
+  });
+  unsubPlayers = onSnapshot(collection(db, "rooms", code, "players"), (snap) => {
+    roomPlayers = {}; snap.forEach(d => roomPlayers[d.id] = d.data());
+    renderRoomMembers();
+  });
+}
+function renderRoomMembers(){
+  const list = $("roomMembers"); if (!list || !currentUser) return;
+  const total = roomData ? roomData.count : 0;
+  const arr = Object.keys(roomPlayers).map(uid => Object.assign({ uid: uid }, roomPlayers[uid]));
+  arr.sort((a,b) => {
+    if (a.finished && b.finished) return (b.pct - a.pct) || ((a.durSec||99999) - (b.durSec||99999));
+    if (a.finished) return -1;
+    if (b.finished) return 1;
+    return (b.done||0) - (a.done||0);
+  });
+  const medals = ["🥇","🥈","🥉"];
+  list.innerHTML = arr.length ? arr.map((pl,i) => {
+    const status = pl.finished
+      ? "<span class='sc'>✅ " + esc2(pl.score) + " · " + (pl.pct||0) + "%" + (pl.durSec ? " · " + pl.durSec + "s" : "") + "</span>"
+      : "<span class='pbar'><i style='width:" + (total ? Math.round((pl.done||0)/total*100) : 0) + "%'></i></span><span class='dt'>Câu " + (pl.done||0) + "/" + total + "</span>";
+    return "<li class='" + (pl.uid === currentUser.uid ? "me" : "") + "'><span class='rk'>" + (pl.finished ? (medals[i] || (i+1)) : "·") + "</span><span class='nm'>" + esc2(pl.name) + (pl.host ? " 👑" : "") + (pl.uid === currentUser.uid ? " (bạn)" : "") + "</span>" + status + "</li>";
+  }).join("") : "<li class='muted'>Chưa có ai trong phòng…</li>";
+}
+function startRoomPoll(){
+  stopRoomPoll(); lastDoneSent = -1;
+  roomPoll = setInterval(async () => {
+    if (!myRoom || myRoom.finished || !db || !currentUser) return;
+    const pt = ($("progressText") || {}).textContent || "";
+    const m = pt.match(/đã qua (\d+) câu/);
+    if (m) { const d = parseInt(m[1],10); if (d !== lastDoneSent) { lastDoneSent = d; try { await updateDoc(doc(db, "rooms", myRoom.code, "players", currentUser.uid), { done: d }); } catch(e){} } }
+  }, 1500);
+}
+function stopRoomPoll(){ if (roomPoll) { clearInterval(roomPoll); roomPoll = null; } }
+function leaveRoomUI(msg){
+  if (unsubRoom) unsubRoom(); if (unsubPlayers) unsubPlayers(); unsubRoom = unsubPlayers = null;
+  stopRoomPoll(); window.__roomActive = null;
+  $("roomLobby").classList.add("hidden"); $("roomHome").classList.remove("hidden");
+  $("roomStartBtn").classList.add("hidden"); $("roomCloseBtn").classList.add("hidden");
+  if (msg) roomErr(msg);
+}
+async function leaveRoom(){
+  const code = myRoom && myRoom.code;
+  if (code && db && currentUser) { try { await deleteDoc(doc(db, "rooms", code, "players", currentUser.uid)); } catch(e){} }
+  myRoom = null; roomData = null; roomPlayers = {};
+  leaveRoomUI("");
+}
+$("roomCreateBtn").addEventListener("click", createRoom);
+$("roomJoinBtn").addEventListener("click", joinRoom);
+$("roomStartBtn").addEventListener("click", async () => { if (myRoom && db) { try { await updateDoc(doc(db, "rooms", myRoom.code), { status: "playing", startedAt: serverTimestamp() }); } catch(e){} } });
+$("roomCloseBtn").addEventListener("click", async () => { if (myRoom && db) { try { await updateDoc(doc(db, "rooms", myRoom.code), { status: myRoom.started ? "done" : "closed" }); } catch(e){} if (!myRoom.started) { myRoom = null; leaveRoomUI("Đã đóng phòng."); } } });
+$("roomLeaveBtn").addEventListener("click", leaveRoom);
 function enterApp(user){
   currentUser = user;
   document.body.classList.remove("locked");
@@ -760,6 +936,7 @@ function enterApp(user){
   $("helloUser").textContent = user.email || "";
   renderHistory(user);
   renderBoard(user);
+  const rb = $("roomBox"); if (rb) rb.classList.remove("hidden");
   watchResults(user);
 }
 $("tabLogin").addEventListener("click", () => setMode("login"));
