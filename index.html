@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#b3261e">
+<meta name="description" content="Web luyện thi Tư tưởng Hồ Chí Minh: 400 câu trắc nghiệm chương 2–6, ôn từng câu, thi thử, phòng thi đấu và Olympia — có đăng nhập đồng bộ lịch sử, bảng xếp hạng.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Luyện thi Tư tưởng Hồ Chí Minh — 400 câu trắc nghiệm">
+<meta property="og:description" content="Ôn từng câu, thi thử 50 câu, thi đấu phòng và Olympia cùng bạn bè. Đăng nhập để đồng bộ lịch sử và lên bảng xếp hạng.">
 <title>Luyện thi Tư tưởng Hồ Chí Minh</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -182,6 +187,65 @@
   #quizBox .quiz-head{position:sticky;top:8px;z-index:20;background:var(--card);padding:10px 12px;border-radius:12px;box-shadow:var(--shadow)}
   #quizBox .progress{position:sticky;top:66px;z-index:20}
   @media (max-width:640px){.hero{padding:42px 14px 70px}.card{border-radius:14px}}
+</style>
+<style id="uiOpt">
+  /* ===== UI OPT (toi uu giao dien 2026-11-11) — chi trinh bay, khong dung logic/du lieu ===== */
+  *{-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{overflow-wrap:break-word}
+  ::selection{background:var(--gold);color:#3a2403}
+  :focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+  section.card{scroll-margin-top:12px}
+  input,select,textarea{max-width:100%}
+  img{max-width:100%}
+  /* Phan hoi khi bam (cam giac nut that tren dien thoai) */
+  .btn:active,.stake:active{transform:scale(.97)}
+  .opt:active:not(:disabled){transform:scale(.99)}
+  .chapters button:active{transform:scale(.98)}
+  .btn,.stake,.opt,.chapters button{transition:transform .1s ease,border-color .15s,background-color .15s,color .15s}
+  /* Hover chi ap dung cho thiet bi co chuot — tranh hover dinh tren cam ung */
+  @media (hover:none){
+    .btn:hover{border-color:var(--line);color:var(--ink)}
+    .btn.primary:hover{background:var(--red);color:#fff}
+    .chapters button:hover{border-color:var(--line);transform:none}
+    .opt:hover:not(:disabled){border-color:var(--line);background:var(--card)}
+    .opt.selected:hover{border-color:var(--red);background:var(--red-l)}
+    .opt.correct:hover{border-color:var(--green);background:var(--green-l)}
+    .opt.wrong:hover{border-color:var(--red);background:var(--red-l)}
+  }
+  @media (hover:hover){
+    .board li:hover,.hist .hrow:hover{border-color:var(--gold)}
+    .board li,.hist .hrow{transition:border-color .15s}
+  }
+  /* Hoa roi: muot hon tren GPU, bot hoa tren man hinh nho de tiet kiem pin */
+  .petal{will-change:transform}
+  @media (max-width:640px){.petal:nth-child(n+9){display:none}}
+  /* Thanh cuon mong cho khung lich su */
+  .hist{scrollbar-width:thin;scrollbar-color:var(--gold) transparent}
+  .hist::-webkit-scrollbar{width:6px}
+  .hist::-webkit-scrollbar-thumb{background:var(--gold);border-radius:99px}
+  /* Che do toi: dong "ban chon" dung mau nen toi cho hop nen */
+  @media (prefers-color-scheme:dark){
+    .wline.you{background:#3a1f1c;color:#f0a49d}
+    .roomcode{color:var(--gold)}
+  }
+  /* Man hinh nho: gon the, chu de doc, nut bam thoai mai */
+  @media (max-width:640px){
+    .card{padding:16px}
+    .q{padding:14px;margin:12px 0}
+    .q h3{font-size:16px}
+    .sticky{margin:0 -16px -16px;padding:10px 16px}
+    .score{font-size:36px}
+    .roomcode{font-size:28px;letter-spacing:5px}
+    .oly-tiles span{width:32px;height:40px;font-size:18px}
+    h2{font-size:17px}
+    .btn{padding:11px 14px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .q{animation:none}
+    *{transition:none!important}
+  }
 </style>
 </head>
 <body class="locked">
