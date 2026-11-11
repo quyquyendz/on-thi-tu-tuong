@@ -269,11 +269,44 @@
 .bp-imgwrap img{max-height:110px;max-width:190px;border:1px solid var(--line);border-radius:8px;display:block}
 .bp-imgdel{position:absolute;top:2px;right:2px;border:none;border-radius:50%;width:20px;height:20px;line-height:1;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:11px}
 </style>
+
+<style id="uiBright">
+:root{
+  --bg:#f5f8fc; --card:#ffffff; --ink:#1d2735; --muted:#5a6b80; --line:#dbe4ef;
+  --red:#d92d20; --red-d:#b42318; --red-l:#fef4f2;
+  --gold:#c77400; --gold-l:#fff8e6;
+  --green:#067647; --green-l:#ecfdf3;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 12px 32px rgba(16,24,40,.08);
+  --r:18px;
+}
+body{background-color:var(--bg);background-image:none;font-size:16.5px}
+.hero{background:linear-gradient(135deg,#fff6e0 0%,#ffeec2 52%,#ffdf9e 100%);border:1px solid #f2d492;color:#6b3410}
+.hero h1{color:#8f1d14;text-shadow:none}
+.hero p{color:#7c4a12;opacity:1}
+.hero .star{color:#eda317;text-shadow:none}
+.hero .stats span{background:rgba(255,255,255,.82);border:1px solid #eec96f;color:#8a5a00}
+.tet-greet{background:#cf271c;color:#fff;border-color:#cf271c;box-shadow:0 4px 14px rgba(207,39,28,.28);text-shadow:none}
+.tet-wish{color:#96660a;text-shadow:none}
+.card{border-radius:var(--r);padding:22px}
+.btn{min-height:48px;padding:12px 20px;font-size:16px;border-radius:12px;font-weight:600}
+.btn.primary{box-shadow:0 6px 16px rgba(217,45,32,.22)}
+.chapters button{min-height:66px;border-radius:14px;background:var(--card)}
+.chapters button.active{background:var(--red-l);border-color:var(--red);color:var(--red-d)}
+.opt{border:1.5px solid var(--line);border-radius:14px;background:var(--card)}
+.opt.selected{border-color:var(--red);background:var(--red-l)}
+input,select,textarea{min-height:48px}
+#petals,.couplet{display:none!important}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0e141d;--card:#16202e;--ink:#edf2f8;--muted:#9db1c7;--line:#2b3a4e;--red-l:#2b1712;--gold-l:#2d230d;--green-l:#0d2318;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35)}
+  .hero{background:linear-gradient(135deg,#2b2118,#1f1a12);border-color:#4a3a20;color:#f0dcb2}
+  .hero h1{color:#ffd968}
+  .hero p{color:#d9c391}
+  .hero .stats span{background:rgba(255,255,255,.06);border-color:#5a4a26;color:#f0dcb2}
+  .tet-wish{color:#e8c96a}
+}
+</style>
 </head>
 <body class="locked">
-<div id="petals" aria-hidden="true"></div>
-<div class="couplet left" aria-hidden="true">Tân xuân khai bút · Học hành tấn tới</div>
-<div class="couplet right" aria-hidden="true">Thi cử đỗ đạt · Vạn sự như ý</div>
 <header class="hero">
   <div class="tet-greet">🧧 CHÚC MỪNG NĂM MỚI 🧧</div>
   <div class="star">★</div>
@@ -2069,9 +2102,6 @@ if (configured && auth) {
 }
 </script>
 
-<script>
-/* Canh hoa Tet roi nhe — trang tri thuan tuy */
-(function(){var box=document.getElementById('petals');if(!box)return;var colors=['#f6c945','#f7a8b8','#ffd968','#f48fb1'];for(var i=0;i<14;i++){var s=document.createElement('span');s.className='petal';var sz=7+Math.random()*8;s.style.width=sz+'px';s.style.height=sz*0.82+'px';s.style.left=(Math.random()*98)+'vw';s.style.background=colors[i%colors.length];s.style.animationDuration=(9+Math.random()*8)+'s';s.style.animationDelay=(-Math.random()*16)+'s';s.style.opacity=(0.55+Math.random()*0.4).toFixed(2);box.appendChild(s);}})();
-</script>
+
 </body>
 </html>
