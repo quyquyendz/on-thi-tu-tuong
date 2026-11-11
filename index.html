@@ -268,6 +268,9 @@
 .bp-imgwrap{position:relative}
 .bp-imgwrap img{max-height:110px;max-width:190px;border:1px solid var(--line);border-radius:8px;display:block}
 .bp-imgdel{position:absolute;top:2px;right:2px;border:none;border-radius:50%;width:20px;height:20px;line-height:1;background:rgba(0,0,0,.65);color:#fff;cursor:pointer;font-size:11px}
+.bp-item{overflow-wrap:anywhere}
+.bp-head span{min-width:0}
+.q h3{overflow-wrap:anywhere}
 </style>
 
 <style id="uiBright">
@@ -1048,17 +1051,23 @@ function bpRichFromText(text){
 function bpDecodeEntities(s){
   return String(s||"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&apos;/g,"'");
 }
+function bpStripTags(s){ return String(s||"").replace(/<(?:"[^"]*"|'[^']*'|[^>"'])*>/g, " "); }
 function bpRichFromHtml(html){
   var h = String(html||"")
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<\s*br\s*\/?\s*>/gi, "\n")
     .replace(/<\/(p|li|h[1-6]|div|tr)>/gi, "\n")
-    .replace(/<(p|li|h[1-6]|div|tr)(\s[^>]*)?>/gi, "\n");
+    .replace(/<(p|li|h[1-6]|div|tr)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, "\n");
   return h.split("\n").map(function(raw){
     var boldText = "", ulText = "", imgs = [];
-    raw.replace(/<(strong|b)(\s[^>]*)?>([\s\S]*?)<\/\1>/gi, function(m, g1, g2, inner){ boldText += bpDecodeEntities(inner.replace(/<[^>]+>/g,"")); return m; });
-    raw.replace(/<u(\s[^>]*)?>([\s\S]*?)<\/u>/gi, function(m, g1, inner){ ulText += bpDecodeEntities(inner.replace(/<[^>]+>/g,"")); return m; });
-    raw.replace(/<img[^>]*\ssrc=(?:"([^"]+)"|'([^']+)')/gi, function(m, s1, s2){ imgs.push(bpDecodeEntities(s1 || s2 || "")); return m; });
-    var text = bpNorm(bpDecodeEntities(raw.replace(/<[^>]+>/g," ")));
+    raw.replace(/<(strong|b)(\s[^>]*)?>([\s\S]*?)<\/\1>/gi, function(m, g1, g2, inner){ boldText += bpDecodeEntities(bpStripTags(inner)); return m; });
+    raw.replace(/<u(\s[^>]*)?>([\s\S]*?)<\/u>/gi, function(m, g1, inner){ ulText += bpDecodeEntities(bpStripTags(inner)); return m; });
+    raw.replace(/<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, function(tag){
+      var sm = tag.match(/\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+      if(sm) imgs.push(bpDecodeEntities(sm[1] || sm[2] || ""));
+      return tag;
+    });
+    var text = bpNorm(bpDecodeEntities(bpStripTags(raw)));
     if(!text && !imgs.length) return null;
     var line = { t: text, bold: text.length > 0 && boldText.replace(/\s+/g,"").length >= 0.6 * text.replace(/\s+/g,"").length && boldText.trim().length > 0,
              ul: text.length > 0 && ulText.replace(/\s+/g,"").length >= 0.6 * text.replace(/\s+/g,"").length && ulText.trim().length > 0 };
@@ -1239,6 +1248,7 @@ function bpParse(lines){
 function bpParseText(text){
   var j = bpExtractJson(text);
   if(j) return j.map(function(x, i){ var o = {q: x.q, opts: x.opts, a: x.a, num: i + 1}; if(x.imgs) o.imgs = x.imgs; if(x.optImgs) o.optImgs = x.optImgs; return o; });
+  if(/<(img|p|div|li|h[1-6]|table|span|strong|b)\b/i.test(String(text || ""))) return bpParse(bpRichFromHtml(text));
   return bpParse(bpRichFromText(text));
 }
 
