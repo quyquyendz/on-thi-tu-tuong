@@ -141,6 +141,11 @@
   .couplet{position:fixed;top:108px;width:44px;padding:16px 0;text-align:center;background:linear-gradient(180deg,#c0271b,#8a1c16);color:#ffd968;font-family:"Playfair Display",Georgia,serif;font-size:19px;font-weight:700;letter-spacing:6px;writing-mode:vertical-rl;border:2px solid #d9a441;border-radius:10px;box-shadow:0 8px 24px rgba(60,10,0,.35);z-index:40}
   .couplet.left{left:14px}.couplet.right{right:14px}
   @media (max-width:1180px){.couplet{display:none}}
+  .witem{border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:9px;text-align:left}
+  .witem h4{margin:4px 0 8px;font-size:15.5px}
+  .wline{border-radius:9px;padding:7px 11px;margin:5px 0;font-size:14.5px}
+  .wline.you{background:#fdeceb;color:#8a1c16}
+  .wline.ok{background:var(--green-l);color:var(--green)}
   .hstats{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
   .hstats .chip{background:var(--gold-l);border:1px solid var(--gold);border-radius:999px;padding:5px 13px;font-size:13.5px;font-weight:600}
   .hist{max-height:430px;overflow:auto}
@@ -318,6 +323,11 @@
     <button class="btn" id="wrongOnlyBtn" type="button">Chỉ xem câu sai</button>
     <button class="btn" id="showAllBtn" type="button">Xem tất cả</button>
     <button class="btn primary" id="againBtn" type="button">Làm đề mới</button>
+    <div id="wrongBox" class="hidden" style="margin-top:16px">
+      <h3 style="margin:0 0 8px">❌ Câu sai cần ôn lại (<span id="wrongCount">0</span>)</h3>
+      <div id="wrongList"></div>
+      <button class="btn primary" id="retryWrongBtn" type="button" style="margin-top:6px">🔁 Làm lại các câu sai</button>
+    </div>
   </section>
 </main>
 <footer class="muted">Đáp án theo bộ đã chốt cho Chương 2 đến 6. Nếu giáo trình lớp bạn khác ở 1–2 câu gây tranh cãi, hãy hỏi lại giảng viên trước khi thi.</footer>
@@ -340,6 +350,8 @@ let answers = {};
 let startTime = 0;
 let timerId = null;
 let submitted = false;
+let lastWrong = [];
+let singleFirstPick = {};
 
 function shuffle(arr){
   const a = arr.slice();
@@ -376,7 +388,7 @@ function start(){
     return {q:q.q, chapter:q.chapter, opts:order.map(i=>q.opts[i]), a:order.indexOf(q.a)};
   });
   answers = {}; submitted = false;
-  singleIdx = 0; singleWrong = {}; singleTried = {}; singleFirst = 0; singleLastCorrect = false;
+  singleIdx = 0; singleWrong = {}; singleTried = {}; singleFirst = 0; singleLastCorrect = false; singleFirstPick = {}; lastWrong = [];
   document.getElementById("setup").classList.add("hidden");
   document.getElementById("modesCard").classList.add("hidden");
   document.getElementById("resultBox").classList.add("hidden");
@@ -444,6 +456,7 @@ function render(){
           if((singleWrong[qi]||[]).includes(oi)) return;
           const first = !singleTried[qi];
           singleTried[qi] = true;
+          if(first) singleFirstPick[qi] = oi;
           if(oi===q.a){
             if(first) singleFirst++;
             answers[qi]=oi; singleLastCorrect=true; render();
@@ -501,8 +514,10 @@ function finishSingle(){
   document.getElementById("scoreText").textContent = right+"/"+current.length+" đúng ngay lần đầu";
   setRing(pct);
   document.getElementById("scoreMsg").textContent = "Bạn đã ôn hết đề theo kiểu từng câu một. Điểm tính theo lần chọn đầu tiên, phần bên dưới hiện đáp án đúng để bạn đối chiếu.";
+  lastWrong = current.map((q,qi)=>({q:q, chosen:singleFirstPick[qi]})).filter(x=>x.chosen!==x.q.a);
   document.getElementById("resultBox").classList.remove("hidden");
   render();
+  renderWrongReview();
 }
 function submit(force){
   if(submitted) return;
@@ -524,10 +539,49 @@ function submit(force){
     pct>=70 ? "Khá tốt rồi, ôn lại các câu sai bên dưới là ổn." :
     pct>=50 ? "Được một nửa, nên làm lại đề mới và ôn lại các câu sai." :
     "Chưa ổn lắm, làm lại từ từ, đọc kỹ từng đáp án nhé.";
+  lastWrong = current.map((q,qi)=>({q:q, chosen:answers[qi]})).filter(x=>x.chosen!==x.q.a);
   document.getElementById("resultBox").classList.remove("hidden");
   render();
+  renderWrongReview();
   document.getElementById("resultBox").scrollIntoView({behavior:"smooth"});
 }
+function renderWrongReview(){
+  const box = document.getElementById("wrongBox");
+  const list = document.getElementById("wrongList");
+  if(!box || !list) return;
+  document.getElementById("wrongCount").textContent = lastWrong.length;
+  document.getElementById("retryWrongBtn").style.display = lastWrong.length ? "" : "none";
+  if(!lastWrong.length){
+    list.innerHTML = '<p style="color:var(--green);font-weight:600;margin:4px 0">🎉 Không sai câu nào — hoàn hảo!</p>';
+  } else {
+    list.innerHTML = lastWrong.map((x,i)=>{
+      const you = x.chosen===undefined ? '<div class="wline you">✗ Bạn chưa trả lời</div>' : '<div class="wline you">✗ Bạn chọn: <b>'+LETTERS[x.chosen]+'. '+esc(x.q.opts[x.chosen])+'</b></div>';
+      return '<div class="witem"><span class="tag">Chương '+x.q.chapter+' · Câu sai '+(i+1)+'</span><h4>'+esc(x.q.q)+'</h4>'+you+'<div class="wline ok">✓ Đáp án đúng: <b>'+LETTERS[x.q.a]+'. '+esc(x.q.opts[x.q.a])+'</b></div></div>';
+    }).join("");
+  }
+  box.classList.remove("hidden");
+}
+function startWrongRetry(){
+  if(!lastWrong.length) return;
+  current = lastWrong.map(x=>x.q);
+  answers = {}; submitted = false;
+  mode = "test"; isMock = false; pendingMock = false;
+  singleIdx = 0; singleWrong = {}; singleTried = {}; singleFirst = 0; singleLastCorrect = false; singleFirstPick = {};
+  document.getElementById("setup").classList.add("hidden");
+  document.getElementById("modesCard").classList.add("hidden");
+  document.getElementById("resultBox").classList.add("hidden");
+  document.getElementById("quizBox").classList.remove("hidden");
+  const sb = document.getElementById("submitBtn");
+  sb.style.display = ""; sb.textContent = "Nộp bài và chấm điểm"; sb.disabled = false;
+  document.getElementById("quizTitle").textContent = "Ôn lại câu sai · "+current.length+" câu";
+  render();
+  startTime = Date.now();
+  clearInterval(timerId);
+  document.getElementById("timer").textContent = "00:00";
+  timerId = setInterval(()=>{ document.getElementById("timer").textContent = fmt(Math.floor((Date.now()-startTime)/1000)); },1000);
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+document.getElementById("retryWrongBtn").addEventListener("click", startWrongRetry);
 function backToSetup(){
   clearInterval(timerId);
   document.getElementById("quizBox").classList.add("hidden");
