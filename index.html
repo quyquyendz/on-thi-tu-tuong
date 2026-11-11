@@ -1060,6 +1060,7 @@ function enterOly(code, isHost, seed){
   unsubOlyP = onSnapshot(collection(db, "olympia", code, "players"), (snap) => {
     olyPlayers = {}; snap.forEach(d => olyPlayers[d.id] = d.data());
     olyRenderMembers();
+    olyRenderStage();
     olySyncMyScore();
   });
   if (olyTick) clearInterval(olyTick);
@@ -1131,9 +1132,11 @@ function olyRenderStage(){
     if (winner) ex = "<p style='font-weight:700;color:var(--green)'>🎉 " + esc2(olyPlayers[winner].name) + " đã đoán đúng chướng ngại vật: " + esc2(O.sets.kw.disp) + "!</p>";
     else if (!olyMyPl().cnvLocked) ex = "<div class='roomrow'><input id='olyGuess' type='text' placeholder='Đoán chướng ngại vật (không cần dấu)…' style='flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)'><button class='btn primary' id='olyGuessBtn' type='button'>Đoán CNV</button></div><p class='muted'>Đoán đúng: +" + Math.max(20, 60 - (olyData.cnvRevealed||0)*10) + " điểm · Đoán sai: mất quyền đoán tiếp.</p>";
     else ex = "<p class='muted'>Bạn đã đoán sai nên mất quyền đoán ở vòng này.</p>";
+    const prevGuessEl = $("olyGuess"); const prevGuess = prevGuessEl ? prevGuessEl.value : "";
     EX.innerHTML = ex;
     const gb = $("olyGuessBtn");
     if (gb) gb.addEventListener("click", olyGuess);
+    const newGuessEl = $("olyGuess"); if (newGuessEl && prevGuess) newGuessEl.value = prevGuess;
     if (st === "cnv") {
       if (O.qSeen !== key) {
         O.qSeen = key;
@@ -1195,14 +1198,24 @@ function olyKdShow(){
 }
 async function olyAnswerQ(field, idx, oi){
   if (!O || !currentUser) return;
-  const upd = {}; upd[field + "." + idx] = { c: oi, at: Date.now() };
+  const pl0 = olyMyPl();
+  if (pl0[field] && pl0[field][idx]) return;
+  const val = { c: oi, at: Date.now() };
+  const upd = {}; upd[field + "." + idx] = val;
+  const pl = olyPlayers[currentUser.uid];
+  if (pl) { if (!pl[field]) pl[field] = {}; pl[field][idx] = val; }
   try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), upd); } catch(e){}
-  olyRenderStage();
+  O.qSeen = ""; olyRenderStage();
 }
 async function olyAnswerVd(idx, oi){
   if (!O || !currentUser) return;
-  const upd = {}; upd["vdAns." + idx] = { c: oi, at: Date.now(), stake: O.vdStake, star: !!O.vdStar };
+  const pl0 = olyMyPl();
+  if (pl0.vdAns && pl0.vdAns[idx]) return;
+  const val = { c: oi, at: Date.now(), stake: O.vdStake, star: !!O.vdStar };
+  const upd = {}; upd["vdAns." + idx] = val;
   if (O.vdStar) upd.vdStarUsed = true;
+  const pl = olyPlayers[currentUser.uid];
+  if (pl) { if (!pl.vdAns) pl.vdAns = {}; pl.vdAns[idx] = val; if (O.vdStar) pl.vdStarUsed = true; }
   try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), upd); } catch(e){}
   O.qSeen = ""; olyRenderStage();
 }
@@ -1213,8 +1226,12 @@ async function olyGuess(){
   if (!v) return;
   if (v === O.sets.kw.plain) {
     const bonus = Math.max(20, 60 - (olyData.cnvRevealed || 0) * 10);
+    const plw = olyPlayers[currentUser.uid];
+    if (plw) { plw.cnvWon = true; plw.cnvBonus = bonus; }
     try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { cnvWon: true, cnvWonAt: Date.now(), cnvBonus: bonus }); } catch(e){}
   } else {
+    const pll = olyPlayers[currentUser.uid];
+    if (pll) pll.cnvLocked = true;
     try { await updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { cnvLocked: true }); } catch(e){}
     alert("Chưa đúng chướng ngại vật — bạn mất quyền đoán ở vòng này.");
   }
@@ -1233,6 +1250,11 @@ function olyOnTick(){
   if (olyData.status === "kd" && O.kdInit && !O.kdLocked && now - (O.lastKdFlush || 0) > 1200) {
     O.lastKdFlush = now;
     updateDoc(doc(db, "olympia", O.code, "players", currentUser.uid), { kdCorrect: O.kdCorrect, kdAnswered: O.kdAnswered }).catch(()=>{});
+  }
+  if (O.isHost && (olyData.status === "cnv" || olyData.status === "cnv2") && !O.hostBusy && Object.keys(olyPlayers).some(u => olyPlayers[u].cnvWon)) {
+    O.hostBusy = true;
+    updateDoc(doc(db, "olympia", O.code), { status: "tt", qIndex: 0, endsAt: now + 15000 }).catch(()=>{}).finally(() => { O.hostBusy = false; });
+    return;
   }
   if (O.isHost && olyData.endsAt && now > olyData.endsAt && !O.hostBusy) {
     O.hostBusy = true;
